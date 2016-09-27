@@ -29,6 +29,6 @@ public class Constant {
     public static final long INITIAL_RECONNECT_DELAY_SECONDS = 1; // second
     public static final long MAX_RECONNECT_DELAY_SECONDS = 60; // seconds
 
-    public static final int CONNECT_TIMEOUT_MILLIS=3000;
+    public static final int CONNECT_TIMEOUT_MILLIS=60000;
 
 }

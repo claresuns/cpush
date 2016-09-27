@@ -11,4 +11,9 @@ public class NotConnectedException extends Exception {
     public NotConnectedException(String message, Throwable cause) {
         super(message, cause);
     }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

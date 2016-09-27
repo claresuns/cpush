@@ -142,7 +142,7 @@ public class APNSClientHandler extends Http2ConnectionHandler {
                 final ErrorResponse errorResponse = gson.fromJson(data.toString(StandardCharsets.UTF_8), ErrorResponse.class);
 
                 APNSClientHandler.this.onDataReceived.received(new APNSNotificationResponse(
-                        pushNotification,success, errorResponse.getReason(), errorResponse.getTimestamp()));
+                        pushNotification, success, errorResponse.getReason(), errorResponse.getTimestamp()));
             } else {
                 log.error("Gateway sent a DATA frame that was not the end of a stream.");
             }

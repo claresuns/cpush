@@ -153,7 +153,7 @@ public class APNSClient {
         }
     }
 
-    public void connect() throws NotConnectedException, InterruptedException {
+    public Future<Void> connect() throws NotConnectedException, InterruptedException {
         final Future<Void> connectionReadyFuture;
 
         if (this.bootstrap.config().group().isShuttingDown() || this.bootstrap.config().group().isShutdown()) {
@@ -216,7 +216,6 @@ public class APNSClient {
                                     APNSClient.this.reconnectDelaySeconds = Constant.INITIAL_RECONNECT_DELAY_SECONDS;
                                     APNSClient.this.reconnectionPromise = future.channel().newPromise();
                                 }
-
                             } else {
                                 log.info("Failed to connect.", future.cause());
                             }
@@ -228,18 +227,11 @@ public class APNSClient {
             }
         }
 
-        connectionReadyFuture.await().addListener(new GenericFutureListener<Future<? super Void>>() {
-            @Override
-            public void operationComplete(final Future<? super Void> future) throws Exception {
-                if (!future.isSuccess()) {
-                    throw new NotConnectedException(future.getNow().toString());
-                }
-            }
-        });
+        return connectionReadyFuture;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public void disconnect() throws InterruptedException {
+    public Future<Void> disconnect() throws InterruptedException {
         log.info("Disconnecting.");
         final Future<Void> disconnectFuture;
 
@@ -277,35 +269,28 @@ public class APNSClient {
             }
         }
 
-        disconnectFuture.await().addListener(new GenericFutureListener<Future<? super Void>>() {
-            @Override
-            public void operationComplete(Future<? super Void> future) throws Exception {
-                APNSClient.this.connectionReadyPromise = null;
-            }
-        });
+        return disconnectFuture;
     }
 
     public void sendAsynchronous(final APNSNotification notification, final Callback callback) throws NotConnectedException {
 
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
-        if (connectionReadyPromise != null && connectionReadyPromise.isSuccess() && connectionReadyPromise.channel().isActive()) {
-
-            connectionReadyPromise.channel().write(notification).addListener(new GenericFutureListener<ChannelFuture>() {
-                @Override
-                public void operationComplete(final ChannelFuture future) throws Exception {
-                    if (!future.isSuccess()) {
-                        log.debug("Failed to write push notification: {}", notification, future.cause());
-                        callback.onFailure(new APNSNotificationResponse(
-                                notification, false, future.cause().toString(), null
-                        ));
-                    }
-                }
-            });
-        } else {
-            callback.onFailure(new APNSNotificationResponse(
-                    notification, false, "APNSclient's connection is not ready.", null
-            ));
+        if (connectionReadyPromise == null || !connectionReadyPromise.isSuccess() || !connectionReadyPromise.channel().isActive()) {
+            throw new NotConnectedException("Client is not ready.");
         }
+
+        connectionReadyPromise.channel().write(notification).addListener(new GenericFutureListener<ChannelFuture>() {
+            @Override
+            public void operationComplete(final ChannelFuture future) throws Exception {
+                if (!future.isSuccess()) {
+                    log.debug("Failed to write push notification: {}", notification, future.cause());
+                    callback.onFailure(new APNSNotificationResponse(
+                            notification, false, future.cause() != null ? future.cause().toString() : future.cause().toString(), null
+                    ));
+                }
+            }
+        });
+
     }
 
     public boolean isConnected() {
