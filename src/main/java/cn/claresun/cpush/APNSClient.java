@@ -275,7 +275,13 @@ public class APNSClient {
     public void sendAsynchronous(final APNSNotification notification, final Callback callback) throws NotConnectedException {
 
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
-        if (connectionReadyPromise == null || !connectionReadyPromise.isSuccess() || !connectionReadyPromise.channel().isActive()) {
+
+        if (connectionReadyPromise == null) {
+            throw new NotConnectedException("Client is not ready.");
+        }
+
+        if (!connectionReadyPromise.isSuccess() || !connectionReadyPromise.channel().isActive()) {
+            this.connectionReadyPromise.channel().close();
             throw new NotConnectedException("Client is not ready.");
         }
 
