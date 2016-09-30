@@ -23,7 +23,10 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created by claresun on 16-8-11.
@@ -43,6 +46,12 @@ public class APNSClient {
     private long reconnectDelaySeconds = Constant.INITIAL_RECONNECT_DELAY_SECONDS;
     private final int connectTimeOut = Constant.CONNECT_TIMEOUT_MILLIS;
 
+    private final Map<APNSNotification, Promise<APNSNotificationResponse>> responsePromises = new IdentityHashMap<>();
+
+    private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
+
+    private final AtomicLong nextNotificationId = new AtomicLong(0);
+
     private OnDataReceived onDataReceived;
 
     public void onDataReceived(final OnDataReceived onDataReceived) {
@@ -55,6 +64,10 @@ public class APNSClient {
 
     public APNSClient(final File p12File, final String password, final String host, final int port) throws IOException {
         this(SslUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), null);
+    }
+
+    public APNSClient(final File p12File, final String password, final String host, final int port, final EventLoopGroup eventLoopGroup) throws IOException {
+        this(SslUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), eventLoopGroup);
     }
 
     protected APNSClient(final SslContext sslContext, final InetSocketAddress address, final EventLoopGroup eventLoopGroup) {
@@ -197,6 +210,18 @@ public class APNSClient {
                                     APNSClient.this.reconnectDelaySeconds = Math.min(APNSClient.this.reconnectDelaySeconds, Constant.MAX_RECONNECT_DELAY_SECONDS);
                                 }
                             }
+
+                            future.channel().eventLoop().submit(new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    for (final Promise<APNSNotificationResponse> responsePromise : APNSClient.this.responsePromises.values()) {
+                                        responsePromise.tryFailure(new NotConnectedException("Client disconnected unexpectedly."));
+                                    }
+
+                                    APNSClient.this.responsePromises.clear();
+                                }
+                            });
                         }
                     });
 
@@ -297,6 +322,61 @@ public class APNSClient {
             }
         });
 
+    }
+
+    public Future<APNSNotificationResponse> send(final APNSNotification notification) throws NotConnectedException {
+
+        final Future<APNSNotificationResponse> responseFuture;
+        final long notificationId = this.nextNotificationId.getAndIncrement();
+
+        final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
+
+        if (connectionReadyPromise != null && connectionReadyPromise.isSuccess() && connectionReadyPromise.channel().isActive()) {
+            final DefaultPromise<APNSNotificationResponse> responsePromise =
+                    new DefaultPromise<>(connectionReadyPromise.channel().eventLoop());
+
+            connectionReadyPromise.channel().eventLoop().submit(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (APNSClient.this.responsePromises.containsKey(notification)) {
+                        responsePromise.setFailure(new IllegalStateException(
+                                "The given notification has already been sent and not yet resolved."));
+                    } else {
+                        APNSClient.this.responsePromises.put(notification, responsePromise);
+                    }
+                }
+            });
+
+            connectionReadyPromise.channel().write(notification).addListener(new GenericFutureListener<ChannelFuture>() {
+
+                @Override
+                public void operationComplete(final ChannelFuture future) throws Exception {
+                    if (future.isSuccess()) {
+                    } else {
+                        log.debug("Failed to write push notification: {}", notification, future.cause());
+
+                        APNSClient.this.responsePromises.remove(notification);
+                        responsePromise.tryFailure(future.cause());
+                    }
+                }
+            });
+
+            responseFuture = responsePromise;
+        } else {
+            log.debug("Failed to send push notification because client is not connected: {}", notification);
+            responseFuture = new FailedFuture<>(
+                    GlobalEventExecutor.INSTANCE, NOT_CONNECTED_EXCEPTION);
+        }
+
+        return responseFuture;
+
+    }
+
+    protected void handlePushNotificationResponse(final APNSNotificationResponse response) {
+        log.debug("Received response from APNs gateway: {}", response);
+
+        this.responsePromises.remove(response.getNotification()).setSuccess(response);
     }
 
     public boolean isConnected() {

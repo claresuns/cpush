@@ -48,12 +48,16 @@ public class APNSClientHandler extends Http2ConnectionHandler {
     private final Map<Integer, APNSNotification> pushNotificationsByStreamId = new HashMap<>();
     private final Map<Integer, Http2Headers> headersByStreamId = new HashMap<>();
 
+    private final APNSClient apnsClient;
+
     private static final Gson gson = new GsonBuilder()
             .registerTypeAdapter(Date.class, new DateAsMillisecondsSinceEpochTypeAdapter())
             .create();
 
-    protected APNSClientHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, final String authority, final int maxUnflushedNotifications, OnDataReceived onDataReceived) {
+    protected APNSClientHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, APNSClient apnsClient, Http2Settings initialSettings, final String authority, final int maxUnflushedNotifications, OnDataReceived onDataReceived) {
         super(decoder, encoder, initialSettings);
+
+        this.apnsClient = apnsClient;
         this.authority = authority;
         this.maxUnflushedNotifications = maxUnflushedNotifications;
         this.onDataReceived = onDataReceived;
@@ -62,9 +66,19 @@ public class APNSClientHandler extends Http2ConnectionHandler {
 
     public static class APNSClientHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<APNSClientHandler, APNSClientHandlerBuilder> {
 
+        private APNSClient apnsClient;
         private String authority;
         private int maxUnflushedNotifications = 0;
         private OnDataReceived onDataReceived;
+
+        public APNSClientHandlerBuilder apnsClient(final APNSClient apnsClient) {
+            this.apnsClient = apnsClient;
+            return this;
+        }
+
+        public APNSClient apnsClient() {
+            return this.apnsClient;
+        }
 
         public APNSClientHandlerBuilder authority(final String authority) {
             this.authority = authority;
@@ -108,7 +122,7 @@ public class APNSClientHandler extends Http2ConnectionHandler {
         public APNSClientHandler build(final Http2ConnectionDecoder decoder, final Http2ConnectionEncoder encoder, final Http2Settings initialSettings) {
             Objects.requireNonNull(this.authority(), "Authority must be set before building an ApnsClientHandler.");
 
-            final APNSClientHandler handler = new APNSClientHandler(decoder, encoder, initialSettings, this.authority(), this.maxUnflushedNotifications(), this.onDataReceived());
+            final APNSClientHandler handler = new APNSClientHandler(decoder, encoder, this.apnsClient(), initialSettings, this.authority(), this.maxUnflushedNotifications(), this.onDataReceived());
             this.frameListener(handler.new APNSClientHandlerFrameAdapter());
             return handler;
         }
@@ -143,6 +157,9 @@ public class APNSClientHandler extends Http2ConnectionHandler {
 
                 APNSClientHandler.this.onDataReceived.received(new APNSNotificationResponse(
                         pushNotification, success, errorResponse.getReason(), errorResponse.getTimestamp()));
+
+                APNSClientHandler.this.apnsClient.handlePushNotificationResponse(new APNSNotificationResponse(
+                        pushNotification, success, errorResponse.getReason(), errorResponse.getTimestamp()));
             } else {
                 log.error("Gateway sent a DATA frame that was not the end of a stream.");
             }
@@ -166,6 +183,11 @@ public class APNSClientHandler extends Http2ConnectionHandler {
                 if (!success) {
                     log.error("Gateway sent an end-of-stream HEADERS frame for an unsuccessful notification.");
                 }
+
+                final APNSNotification pushNotification = APNSClientHandler.this.pushNotificationsByStreamId.remove(streamId);
+
+                APNSClientHandler.this.apnsClient.handlePushNotificationResponse(new APNSNotificationResponse(
+                        pushNotification, success, null, null));
 
             } else {
                 APNSClientHandler.this.headersByStreamId.put(streamId, headers);

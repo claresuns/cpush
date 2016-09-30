@@ -40,7 +40,7 @@ public class APNSClientTest {
 
 
         try {
-            this.apnsClient.connect();
+            this.apnsClient.connect().await();
         }catch (Exception ex){
             System.out.println(ex);
         }
@@ -68,18 +68,29 @@ public class APNSClientTest {
 
             pushNotification = new APNSNotification(token, "com.autohome", payload);
         }
+        try {
+            /*this.apnsClient.sendAsynchronous(pushNotification, new Callback<APNSNotificationResponse>() {
+                @Override
+                public void onSuccess(APNSNotificationResponse result) {
+                    System.out.println("Write success.");
+                }
 
-        this.apnsClient.sendAsynchronous(pushNotification, new Callback<APNSNotificationResponse>() {
-            @Override
-            public void onSuccess(APNSNotificationResponse result) {
-                System.out.println("Write success.");
-            }
+                @Override
+                public void onFailure(APNSNotificationResponse result) {
+                    System.out.println(result);
+                }
+            });*/
 
-            @Override
-            public void onFailure(APNSNotificationResponse result) {
-                System.out.println(result);
-            }
-        });
+            this.apnsClient.send(pushNotification).await().addListener(new GenericFutureListener<Future<? super APNSNotificationResponse>>() {
+                @Override
+                public void operationComplete(Future<? super APNSNotificationResponse> future) throws Exception {
+                    System.out.println("done.");
+                }
+            });
+        }catch (Exception ex){
+
+        }
+
 
         for (;;){
             Thread.sleep(100000);

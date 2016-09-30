@@ -18,6 +18,18 @@ public class APNSNotificationResponse {
         this.tokenExpirationTimestamp = tokenExpirationTimestamp;
     }
 
+    public APNSNotification getNotification() {
+        return notification;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public Date getTokenExpirationTimestamp() {
+        return tokenExpirationTimestamp;
+    }
+
     public APNSNotification getToken() {
         return notification;
     }
