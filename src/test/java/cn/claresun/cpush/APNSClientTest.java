@@ -24,9 +24,10 @@ import java.io.File;
 public class APNSClientTest {
 
     private APNSClient apnsClient;
+
     @Before
     public void before() throws Exception {
-        apnsClient=new APNSClient(new File("/home/claresun/cert/autohome.p12"), "111111", Constant.PRODUCTION_APNS_HOST,Constant.DEFAULT_APNS_PORT);
+        apnsClient = new APNSClient(new File("/home/claresun/cert/autohome.p12"), "111111", Constant.PRODUCTION_APNS_HOST, Constant.DEFAULT_APNS_PORT);
         apnsClient.onDataReceived(new OnDataReceived<APNSNotificationResponse>() {
             @Override
             public void received(APNSNotificationResponse data) {
@@ -41,7 +42,7 @@ public class APNSClientTest {
 
         try {
             this.apnsClient.connect().await();
-        }catch (Exception ex){
+        } catch (Exception ex) {
             System.out.println(ex);
         }
 
@@ -69,7 +70,7 @@ public class APNSClientTest {
             pushNotification = new APNSNotification(token, "com.autohome", payload);
         }
         try {
-            /*this.apnsClient.sendAsynchronous(pushNotification, new Callback<APNSNotificationResponse>() {
+            this.apnsClient.sendAsynchronous(pushNotification, new Callback<APNSNotificationResponse>() {
                 @Override
                 public void onSuccess(APNSNotificationResponse result) {
                     System.out.println("Write success.");
@@ -79,24 +80,107 @@ public class APNSClientTest {
                 public void onFailure(APNSNotificationResponse result) {
                     System.out.println(result);
                 }
-            });*/
-
-            this.apnsClient.send(pushNotification).await().addListener(new GenericFutureListener<Future<? super APNSNotificationResponse>>() {
-                @Override
-                public void operationComplete(Future<? super APNSNotificationResponse> future) throws Exception {
-                    System.out.println("done.");
-                }
             });
-        }catch (Exception ex){
+
+
+        } catch (Exception ex) {
 
         }
 
 
-        for (;;){
+        for (; ; ) {
             Thread.sleep(100000);
         }
 
         //testDisConnect();
+    }
+
+    @Test
+    public void testSend() throws Exception {
+        testConnect();
+        final APNSNotification pushNotification;
+
+        {
+            final APNSPayloadBuilder payloadBuilder = new APNSPayloadBuilder();
+            payloadBuilder.setAlertBody("autohome");
+
+            final String payload = payloadBuilder.buildWithDefaultMaximumLength();
+            final String token = SslUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a");
+
+            pushNotification = new APNSNotification(token, "com.autohome", payload);
+        }
+        try {
+            this.apnsClient.send(pushNotification).await().addListener(new GenericFutureListener<Future<? super Result>>() {
+                @Override
+                public void operationComplete(Future<? super Result> future) throws Exception {
+                    if (future.isSuccess()) {
+
+                    } else {
+                        System.out.println(future.cause());
+                    }
+                }
+            });
+
+        } catch (Exception ex) {
+
+        }
+
+        testDisConnect();
+    }
+
+    @Test
+    public void testMutliSend() throws Exception {
+        testConnect();
+
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                final APNSNotification pushNotification;
+
+                {
+                    final APNSPayloadBuilder payloadBuilder = new APNSPayloadBuilder();
+                    payloadBuilder.setAlertBody("autohome");
+
+                    final String payload = payloadBuilder.buildWithDefaultMaximumLength();
+                    final String token = SslUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a");
+
+                    pushNotification = new APNSNotification(token, "com.autohome", payload);
+                }
+                try {
+                    APNSClientTest.this.apnsClient.send(pushNotification).await().addListener(new GenericFutureListener<Future<? super Result>>() {
+                        @Override
+                        public void operationComplete(Future<? super Result> future) throws Exception {
+                            if (future.isSuccess()) {
+
+                            } else {
+                                System.out.println(future.cause());
+                            }
+                        }
+                    });
+
+                } catch (Exception ex) {
+
+                }
+
+                System.out.println("end");
+
+            }
+        };
+
+        for (int i = 0; i <20 ; i++) {
+            Thread t1=new Thread(r);
+            t1.start();
+        }
+
+        while (true){
+            Thread.sleep(10000);
+        }
     }
 
     @After

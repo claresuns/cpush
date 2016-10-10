@@ -6,7 +6,7 @@ import cn.claresun.cpush.model.APNSNotificationResponse;
 import cn.claresun.cpush.util.Constant;
 import cn.claresun.cpush.util.SslUtil;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -46,7 +46,7 @@ public class APNSClient {
     private long reconnectDelaySeconds = Constant.INITIAL_RECONNECT_DELAY_SECONDS;
     private final int connectTimeOut = Constant.CONNECT_TIMEOUT_MILLIS;
 
-    private final Map<APNSNotification, Promise<APNSNotificationResponse>> responsePromises = new IdentityHashMap<>();
+    private final Map<APNSNotification, Promise<Result>> responsePromises = new IdentityHashMap<>();
 
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
 
@@ -77,13 +77,12 @@ public class APNSClient {
             this.bootstrap.group(eventLoopGroup);
             this.shouldShutDownEventLoopGroup = false;
         } else {
-            this.bootstrap.group(new NioEventLoopGroup(1));
+            this.bootstrap.group(new NioEventLoopGroup(4));
             this.shouldShutDownEventLoopGroup = true;
         }
 
         this.bootstrap.channel(NioSocketChannel.class);
         this.bootstrap.option(ChannelOption.TCP_NODELAY, true).
-                option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT).
                 option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.connectTimeOut);
         this.bootstrap.remoteAddress(address);
         this.bootstrap.handler(new ChannelInitializer<SocketChannel>() {
@@ -215,7 +214,7 @@ public class APNSClient {
 
                                 @Override
                                 public void run() {
-                                    for (final Promise<APNSNotificationResponse> responsePromise : APNSClient.this.responsePromises.values()) {
+                                    for (final Promise<Result> responsePromise : APNSClient.this.responsePromises.values()) {
                                         responsePromise.tryFailure(new NotConnectedException("Client disconnected unexpectedly."));
                                     }
 
@@ -324,15 +323,14 @@ public class APNSClient {
 
     }
 
-    public Future<APNSNotificationResponse> send(final APNSNotification notification) throws NotConnectedException {
+    public Future<Result> send(final APNSNotification notification) throws NotConnectedException {
 
-        final Future<APNSNotificationResponse> responseFuture;
-        final long notificationId = this.nextNotificationId.getAndIncrement();
+        final Future<Result> responseFuture;
 
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
 
         if (connectionReadyPromise != null && connectionReadyPromise.isSuccess() && connectionReadyPromise.channel().isActive()) {
-            final DefaultPromise<APNSNotificationResponse> responsePromise =
+            final DefaultPromise<Result> responsePromise =
                     new DefaultPromise<>(connectionReadyPromise.channel().eventLoop());
 
             connectionReadyPromise.channel().eventLoop().submit(new Runnable() {
@@ -353,6 +351,7 @@ public class APNSClient {
                 @Override
                 public void operationComplete(final ChannelFuture future) throws Exception {
                     if (future.isSuccess()) {
+                        responsePromise.trySuccess(null);
                     } else {
                         log.debug("Failed to write push notification: {}", notification, future.cause());
 
@@ -373,11 +372,11 @@ public class APNSClient {
 
     }
 
-    protected void handlePushNotificationResponse(final APNSNotificationResponse response) {
+    /*protected void handlePushNotificationResponse(final APNSNotificationResponse response) {
         log.debug("Received response from APNs gateway: {}", response);
 
         this.responsePromises.remove(response.getNotification()).setSuccess(response);
-    }
+    }*/
 
     public boolean isConnected() {
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
