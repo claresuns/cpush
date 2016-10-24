@@ -6,7 +6,7 @@ import cn.claresun.cpush.model.APNSNotificationResponse;
 import cn.claresun.cpush.util.Constant;
 import cn.claresun.cpush.util.SslUtil;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.UnpooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -77,13 +77,14 @@ public class APNSClient {
             this.bootstrap.group(eventLoopGroup);
             this.shouldShutDownEventLoopGroup = false;
         } else {
-            this.bootstrap.group(new NioEventLoopGroup(4));
+            this.bootstrap.group(new NioEventLoopGroup(2));
             this.shouldShutDownEventLoopGroup = true;
         }
 
         this.bootstrap.channel(NioSocketChannel.class);
         this.bootstrap.option(ChannelOption.TCP_NODELAY, true).
-                option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.connectTimeOut);
+                option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.connectTimeOut).option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+        ;
         this.bootstrap.remoteAddress(address);
         this.bootstrap.handler(new ChannelInitializer<SocketChannel>() {
 
@@ -355,9 +356,10 @@ public class APNSClient {
                     } else {
                         log.debug("Failed to write push notification: {}", notification, future.cause());
 
-                        APNSClient.this.responsePromises.remove(notification);
                         responsePromise.tryFailure(future.cause());
                     }
+
+                    APNSClient.this.responsePromises.remove(notification);
                 }
             });
 

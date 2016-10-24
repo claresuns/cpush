@@ -21,14 +21,14 @@ public class Constant {
 
     public static final long DEFAULT_FLUSH_AFTER_IDLE_MILLIS = 50; //millis second
 
-    public static final int DEFAULT_MAX_UNFLUSHED_NOTIFICATIONS = 128;
+    public static final int DEFAULT_MAX_UNFLUSHED_NOTIFICATIONS = 64;
 
-    public static final int PING_TIME_OUT = 30; // second
-    public static final int PING_IDLE_TIME_MILLIS =10000; // millis second
+    public static final int PING_TIME_OUT = 100; // second
+    public static final int PING_IDLE_TIME_MILLIS =40000; // millis second
 
-    public static final long INITIAL_RECONNECT_DELAY_SECONDS = 1; // second
+    public static final long INITIAL_RECONNECT_DELAY_SECONDS = 3; // second
     public static final long MAX_RECONNECT_DELAY_SECONDS = 60; // seconds
 
-    public static final int CONNECT_TIMEOUT_MILLIS=10000;
+    public static final int CONNECT_TIMEOUT_MILLIS=180000;
 
 }
