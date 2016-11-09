@@ -1,8 +1,11 @@
 package cn.claresun.cpush;
 
+import cn.claresun.cpush.dns.InetAddressPool;
 import cn.claresun.cpush.exception.NotConnectedException;
-import cn.claresun.cpush.model.APNSNotification;
-import cn.claresun.cpush.model.APNSNotificationResponse;
+import cn.claresun.cpush.exception.PoolNotReadyException;
+import cn.claresun.cpush.handler.APNSClientHandler;
+import cn.claresun.cpush.handler.APNSNotification;
+import cn.claresun.cpush.handler.APNSNotificationResponse;
 import cn.claresun.cpush.util.Constant;
 import cn.claresun.cpush.util.SslUtil;
 import io.netty.bootstrap.Bootstrap;
@@ -37,6 +40,8 @@ public class APNSClient {
     private final Bootstrap bootstrap;
     private final boolean shouldShutDownEventLoopGroup;
 
+    private InetAddressPool inetAddressPool;
+
     private long writeTimeoutMillis = Constant.DEFAULT_WRITE_TIMEOUT_MILLIS;
 
     private Long gracefulShutdownTimeoutMillis;
@@ -50,7 +55,8 @@ public class APNSClient {
 
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
 
-    private final AtomicLong nextNotificationId = new AtomicLong(0);
+    //temporary
+    private int port;
 
     private OnDataReceived onDataReceived;
 
@@ -58,12 +64,15 @@ public class APNSClient {
         this.onDataReceived = onDataReceived;
     }
 
-    public APNSClient(final File p12File, final String password) throws IOException {
+    public APNSClient(final File p12File, final String password) throws IOException, PoolNotReadyException {
         this(p12File, password, Constant.DEVELOPMENT_APNS_HOST, Constant.DEFAULT_APNS_PORT);
     }
 
-    public APNSClient(final File p12File, final String password, final String host, final int port) throws IOException {
+    public APNSClient(final File p12File, final String password, final String host, final int port) throws IOException, PoolNotReadyException {
+
         this(SslUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), null);
+        inetAddressPool = InetAddressPool.getInstance().init(host);
+        this.port = port;
     }
 
     public APNSClient(final File p12File, final String password, final String host, final int port, final EventLoopGroup eventLoopGroup) throws IOException {
@@ -82,9 +91,9 @@ public class APNSClient {
         }
 
         this.bootstrap.channel(NioSocketChannel.class);
-        this.bootstrap.option(ChannelOption.TCP_NODELAY, true).
-                option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.connectTimeOut).option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-        ;
+        this.bootstrap.option(ChannelOption.TCP_NODELAY, true);
+        this.bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.connectTimeOut);
+        this.bootstrap.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
         this.bootstrap.remoteAddress(address);
         this.bootstrap.handler(new ChannelInitializer<SocketChannel>() {
 
@@ -166,17 +175,18 @@ public class APNSClient {
         }
     }
 
-    public Future<Void> connect() throws NotConnectedException, InterruptedException {
+    public Future<Void> connect() {
         final Future<Void> connectionReadyFuture;
 
         if (this.bootstrap.config().group().isShuttingDown() || this.bootstrap.config().group().isShutdown()) {
-            throw new NotConnectedException("Client's bootstrap is shutdown.");
+            connectionReadyFuture = new FailedFuture<>(GlobalEventExecutor.INSTANCE,
+                    new IllegalStateException("The event loop group is shut down."));
         } else {
             synchronized (this.bootstrap) {
 
                 if (this.connectionReadyPromise == null) {
 
-                    final ChannelFuture connectFuture = this.bootstrap.connect();
+                    final ChannelFuture connectFuture = this.bootstrap.connect(inetAddressPool.next(), this.port);
                     this.connectionReadyPromise = connectFuture.channel().newPromise();
 
                     connectFuture.channel().closeFuture().addListener(new GenericFutureListener<ChannelFuture>() {
@@ -207,7 +217,6 @@ public class APNSClient {
                                         }
                                     }, APNSClient.this.reconnectDelaySeconds, TimeUnit.SECONDS);
 
-                                    APNSClient.this.reconnectDelaySeconds = Math.min(APNSClient.this.reconnectDelaySeconds, Constant.MAX_RECONNECT_DELAY_SECONDS);
                                 }
                             }
 
@@ -216,7 +225,9 @@ public class APNSClient {
                                 @Override
                                 public void run() {
                                     for (final Promise<Result> responsePromise : APNSClient.this.responsePromises.values()) {
-                                        responsePromise.tryFailure(new NotConnectedException("Client disconnected unexpectedly."));
+                                        if (!responsePromise.isDone()) {
+                                            responsePromise.tryFailure(new NotConnectedException("Client disconnected unexpectedly."));
+                                        }
                                     }
 
                                     APNSClient.this.responsePromises.clear();
@@ -238,7 +249,6 @@ public class APNSClient {
                                         log.info("Connected to {}.", future.channel().remoteAddress());
                                     }
 
-                                    APNSClient.this.reconnectDelaySeconds = Constant.INITIAL_RECONNECT_DELAY_SECONDS;
                                     APNSClient.this.reconnectionPromise = future.channel().newPromise();
                                 }
                             } else {
@@ -253,6 +263,23 @@ public class APNSClient {
         }
 
         return connectionReadyFuture;
+    }
+
+    public Future<Void> getReconnectionFuture() {
+        final Future<Void> reconnectionFuture;
+
+        synchronized (this.bootstrap) {
+            if (this.isConnected()) {
+                reconnectionFuture = this.connectionReadyPromise.channel().newSucceededFuture();
+            } else if (this.reconnectionPromise != null) {
+                reconnectionFuture = this.reconnectionPromise;
+            } else {
+                reconnectionFuture = new FailedFuture<>(GlobalEventExecutor.INSTANCE,
+                        new IllegalStateException("Client was not previously connected."));
+            }
+        }
+
+        return reconnectionFuture;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -324,13 +351,19 @@ public class APNSClient {
 
     }
 
-    public Future<Result> send(final APNSNotification notification) throws NotConnectedException {
+    public Future<Result> send(final APNSNotification notification) {
 
         final Future<Result> responseFuture;
 
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
 
-        if (connectionReadyPromise != null && connectionReadyPromise.isSuccess() && connectionReadyPromise.channel().isActive()) {
+        if (connectionReadyPromise == null ||
+                !connectionReadyPromise.isSuccess() ||
+                !connectionReadyPromise.channel().isActive()) {
+            log.debug("Failed to send push notification because client is not connected: {}", notification);
+            responseFuture = new FailedFuture<>(
+                    GlobalEventExecutor.INSTANCE, NOT_CONNECTED_EXCEPTION);
+        } else {
             final DefaultPromise<Result> responsePromise =
                     new DefaultPromise<>(connectionReadyPromise.channel().eventLoop());
 
@@ -364,78 +397,13 @@ public class APNSClient {
             });
 
             responseFuture = responsePromise;
-        } else {
-            log.debug("Failed to send push notification because client is not connected: {}", notification);
-            responseFuture = new FailedFuture<>(
-                    GlobalEventExecutor.INSTANCE, NOT_CONNECTED_EXCEPTION);
         }
 
         return responseFuture;
-
     }
-
-    /*protected void handlePushNotificationResponse(final APNSNotificationResponse response) {
-        log.debug("Received response from APNs gateway: {}", response);
-
-        this.responsePromises.remove(response.getNotification()).setSuccess(response);
-    }*/
 
     public boolean isConnected() {
         final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
         return (connectionReadyPromise != null && connectionReadyPromise.isSuccess());
     }
-
-    /*public void sendAsynchronous(final List<APNSNotification> notifications, final Callback callback) throws NotConnectedException {
-        final int listSize = notifications.size();
-
-        final ChannelPromise connectionReadyPromise = this.connectionReadyPromise;
-        if (connectionReadyPromise != null && connectionReadyPromise.isSuccess() && connectionReadyPromise.channel().isActive()) {
-            GenericFutureListener<ChannelFuture> futureListener = new MutliNotificatinsFutureListener(connectionReadyPromise.channel(), listSize, callback);
-
-            for (APNSNotification notification : notifications) {
-                connectionReadyPromise.channel().write(notification).addListener(futureListener);
-            }
-        } else {
-            callback.onFailure(null);
-        }
-    }
-
-    private class MutliNotificatinsFutureListener implements GenericFutureListener<ChannelFuture> {
-        private int completeCount;
-        private int expertCount;
-        private Channel channel;
-        private Callback callback;
-
-        public MutliNotificatinsFutureListener(Channel channel, int expertCount, Callback callback) {
-            this(channel, expertCount, 1, callback);
-        }
-
-        public MutliNotificatinsFutureListener(Channel channel, int expertCount, int completeCount, Callback callback) {
-            this.channel = channel;
-            this.expertCount = expertCount;
-            this.expertCount = expertCount;
-            this.callback = callback;
-        }
-
-
-        @Override
-        public void operationComplete(ChannelFuture future) throws Exception {
-            synchronized (this) {
-
-                if (completeCount >= expertCount) {
-
-                    if (future.isSuccess()) {
-                        this.callback.onSuccess(null);
-                    } else {
-                        log.debug("Failed to write push notifications ", future.cause());
-                        this.callback.onFailure(null);
-                    }
-
-                    completeCount = 1;
-                }
-
-                completeCount++;
-            }
-        }
-    }*/
 }

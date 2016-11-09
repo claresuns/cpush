@@ -1,4 +1,4 @@
-package cn.claresun.cpush.model;
+package cn.claresun.cpush.handler;
 
 /**
  * Created by claresun on 16-8-11.

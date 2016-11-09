@@ -1,4 +1,4 @@
-package cn.claresun.cpush.model;
+package cn.claresun.cpush.handler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

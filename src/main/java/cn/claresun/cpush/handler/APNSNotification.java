@@ -1,4 +1,4 @@
-package cn.claresun.cpush.model;
+package cn.claresun.cpush.handler;
 
 import java.util.Date;
 
