@@ -19,6 +19,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import io.netty.handler.traffic.ChannelTrafficShapingHandler;
 import io.netty.util.concurrent.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,12 @@ public class APNSClient {
 
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
 
+    public void setWriteLimitBytes(int writeLimitBytes) {
+        this.writeLimitBytes = writeLimitBytes;
+    }
+
+    private int writeLimitBytes;
+
     //temporary
     private int port;
 
@@ -86,7 +93,7 @@ public class APNSClient {
             this.bootstrap.group(eventLoopGroup);
             this.shouldShutDownEventLoopGroup = false;
         } else {
-            this.bootstrap.group(new NioEventLoopGroup(2));
+            this.bootstrap.group(new NioEventLoopGroup(1));
             this.shouldShutDownEventLoopGroup = true;
         }
 
@@ -106,6 +113,9 @@ public class APNSClient {
                 }
 
                 pipeline.addLast(sslContext.newHandler(channel.alloc()));
+
+                pipeline.addLast(new ChannelTrafficShapingHandler(APNSClient.this.writeLimitBytes,0));
+
                 pipeline.addLast(new ApplicationProtocolNegotiationHandler("") {
                     @Override
                     protected void configurePipeline(final ChannelHandlerContext context, final String protocol) {
