@@ -34,7 +34,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-http2</artifactId>
-            <version>4.1.1.Final</version>
+            <version>4.1.6.Final</version>
             <exclusions>
                 <exclusion>
                     <groupId>io.netty</groupId>
@@ -47,7 +47,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>1.1.33.Fork23</version>
-            <scope>test</scope>
         </dependency>
 
 
