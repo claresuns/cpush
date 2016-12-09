@@ -18,7 +18,7 @@ public enum DeliveryPriority {
         return this.code;
     }
 
-    protected static DeliveryPriority getDeliveryPriority(final int code) {
+    public static DeliveryPriority getDeliveryPriority(final int code) {
         for (final DeliveryPriority priority : DeliveryPriority.values()) {
             if (priority.getCode() == code) {
                 return priority;

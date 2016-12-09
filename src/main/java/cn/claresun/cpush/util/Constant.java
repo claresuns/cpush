@@ -16,18 +16,18 @@ public class Constant {
     public static final AsciiString APNS_EXPIRATION_HEADER = new AsciiString("apns-expiration");
     public static final AsciiString APNS_TOPIC_HEADER = new AsciiString("apns-topic");
     public static final AsciiString APNS_PRIORITY_HEADER = new AsciiString("apns-priority");
+    
     public static final int INITIAL_PAYLOAD_BUFFER_CAPACITY = 4096;
     public static final long STREAM_ID_RESET_THRESHOLD = Integer.MAX_VALUE - 1;
 
-    public static final long DEFAULT_FLUSH_AFTER_IDLE_MILLIS = 50; //millis second
+    public static final long DEFAULT_FLUSH_AFTER_IDLE_MILLIS = 250; //millis second
 
-    public static final int DEFAULT_MAX_UNFLUSHED_NOTIFICATIONS = 64;
+    public static final int DEFAULT_MAX_UNFLUSHED_NOTIFICATIONS = 32;
 
-    public static final int PING_TIME_OUT = 100; // second
-    public static final int PING_IDLE_TIME_MILLIS =40000; // millis second
+    public static final int PING_TIME_OUT = 60; // second
+    public static final int PING_IDLE_TIME_MILLIS =30000; // millis second
 
     public static final long INITIAL_RECONNECT_DELAY_SECONDS = 3; // second
-    public static final long MAX_RECONNECT_DELAY_SECONDS = 60; // seconds
 
     public static final int CONNECT_TIMEOUT_MILLIS=180000;
 

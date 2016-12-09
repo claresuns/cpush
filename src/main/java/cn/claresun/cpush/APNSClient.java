@@ -7,7 +7,7 @@ import cn.claresun.cpush.handler.APNSClientHandler;
 import cn.claresun.cpush.handler.APNSNotification;
 import cn.claresun.cpush.handler.APNSNotificationResponse;
 import cn.claresun.cpush.util.Constant;
-import cn.claresun.cpush.util.SslUtil;
+import cn.claresun.cpush.util.SSLUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.*;
@@ -30,7 +30,6 @@ import java.net.InetSocketAddress;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created by claresun on 16-8-11.
@@ -77,13 +76,13 @@ public class APNSClient {
 
     public APNSClient(final File p12File, final String password, final String host, final int port) throws IOException, PoolNotReadyException {
 
-        this(SslUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), null);
+        this(SSLUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), null);
         inetAddressPool = InetAddressPool.getInstance().init(host);
         this.port = port;
     }
 
     public APNSClient(final File p12File, final String password, final String host, final int port, final EventLoopGroup eventLoopGroup) throws IOException {
-        this(SslUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), eventLoopGroup);
+        this(SSLUtil.getSslContextWithP12File(p12File, password), new InetSocketAddress(host, port), eventLoopGroup);
     }
 
     protected APNSClient(final SslContext sslContext, final InetSocketAddress address, final EventLoopGroup eventLoopGroup) {

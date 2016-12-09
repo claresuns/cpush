@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by claresun on 16-11-8.
@@ -22,19 +23,12 @@ public class InetAddressPool {
     private int capacity;
 
     ArrayList<InetAddressWrapper> addressList = new ArrayList<>(DEFAULT_ADDRESSES_SIZE);
-    private int index;
+    private final AtomicInteger index = new AtomicInteger();
 
     private ScheduledExecutorService updaterExecutorService = Executors.newScheduledThreadPool(1);
 
-    public synchronized InetAddress next() {
-        checkIndexRange();
-        return this.addressList.get(this.index++).getAddress();
-    }
-
-    private void checkIndexRange() {
-        if (this.index >= this.capacity) {
-            this.index = 0;
-        }
+    public InetAddress next() {
+        return this.addressList.get(Math.abs(Math.abs(this.index.incrementAndGet() & (this.capacity - 1)))).getAddress();
     }
 
     private void add(InetAddressWrapper addressWrapper) {

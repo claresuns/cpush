@@ -17,8 +17,8 @@ import java.util.Objects;
 /**
  * Created by claresun on 16-9-1.
  */
-public class SslUtil {
-    private static final Logger log = LoggerFactory.getLogger(SslUtil.class);
+public class SSLUtil {
+    private static final Logger log = LoggerFactory.getLogger(SSLUtil.class);
 
     public static SslContext getSslContextWithP12File(final File p12File, final String password) throws FileNotFoundException, SSLException, IOException {
         try (final InputStream p12InputStream = new FileInputStream(p12File)) {

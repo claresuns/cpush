@@ -1,18 +1,19 @@
 package cn.claresun.cpush;
 
-import cn.claresun.cpush.model.APNSNotification;
-import cn.claresun.cpush.model.APNSNotificationResponse;
-import cn.claresun.cpush.model.APNSPayloadBuilder;
+
+import cn.claresun.cpush.handler.APNSNotification;
+import cn.claresun.cpush.handler.APNSNotificationResponse;
+import cn.claresun.cpush.handler.APNSPayloadBuilder;
 import cn.claresun.cpush.util.Constant;
-import cn.claresun.cpush.util.SslUtil;
-import io.netty.channel.Channel;
+import cn.claresun.cpush.util.SSLUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import org.junit.Test;
-import org.junit.Before;
 import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.File;
+import java.util.concurrent.Semaphore;
 
 /**
  * APNSClientTest Tester.
@@ -24,21 +25,24 @@ import java.io.File;
 public class APNSClientTest {
 
     private APNSClient apnsClient;
+    final Semaphore semp = new Semaphore(1);
 
     @Before
     public void before() throws Exception {
+        semp.acquire();
         apnsClient = new APNSClient(new File("/home/claresun/cert/autohome.p12"), "111111", Constant.PRODUCTION_APNS_HOST, Constant.DEFAULT_APNS_PORT);
+        apnsClient.setWriteLimitBytes(50);
         apnsClient.onDataReceived(new OnDataReceived<APNSNotificationResponse>() {
             @Override
             public void received(APNSNotificationResponse data) {
                 System.out.println(data);
+                semp.release();
             }
         });
     }
 
     @Test
     public void testConnect() throws InterruptedException {
-
 
         try {
             this.apnsClient.connect().await();
@@ -54,48 +58,6 @@ public class APNSClientTest {
     }
 
     @Test
-    public void testSendAsync() throws Exception {
-
-        testConnect();
-
-        final APNSNotification pushNotification;
-
-        {
-            final APNSPayloadBuilder payloadBuilder = new APNSPayloadBuilder();
-            payloadBuilder.setAlertBody("autohome");
-
-            final String payload = payloadBuilder.buildWithDefaultMaximumLength();
-            final String token = SslUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a");
-
-            pushNotification = new APNSNotification(token, "com.autohome", payload);
-        }
-        try {
-            this.apnsClient.sendAsynchronous(pushNotification, new Callback<APNSNotificationResponse>() {
-                @Override
-                public void onSuccess(APNSNotificationResponse result) {
-                    System.out.println("Write success.");
-                }
-
-                @Override
-                public void onFailure(APNSNotificationResponse result) {
-                    System.out.println(result);
-                }
-            });
-
-
-        } catch (Exception ex) {
-
-        }
-
-
-        for (; ; ) {
-            Thread.sleep(100000);
-        }
-
-        //testDisConnect();
-    }
-
-    @Test
     public void testSend() throws Exception {
         testConnect();
         final APNSNotification pushNotification;
@@ -105,7 +67,7 @@ public class APNSClientTest {
             payloadBuilder.setAlertBody("autohome");
 
             final String payload = payloadBuilder.buildWithDefaultMaximumLength();
-            final String token = SslUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a");
+            final String token = SSLUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a1");
 
             pushNotification = new APNSNotification(token, "com.autohome", payload);
         }
@@ -125,62 +87,9 @@ public class APNSClientTest {
 
         }
 
+        semp.acquire();
+
         testDisConnect();
-    }
-
-    @Test
-    public void testMutliSend() throws Exception {
-        testConnect();
-
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                final APNSNotification pushNotification;
-
-                {
-                    final APNSPayloadBuilder payloadBuilder = new APNSPayloadBuilder();
-                    payloadBuilder.setAlertBody("autohome");
-
-                    final String payload = payloadBuilder.buildWithDefaultMaximumLength();
-                    final String token = SslUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a");
-
-                    pushNotification = new APNSNotification(token, "com.autohome", payload);
-                }
-                try {
-                    APNSClientTest.this.apnsClient.send(pushNotification).await().addListener(new GenericFutureListener<Future<? super Result>>() {
-                        @Override
-                        public void operationComplete(Future<? super Result> future) throws Exception {
-                            if (future.isSuccess()) {
-
-                            } else {
-                                System.out.println(future.cause());
-                            }
-                        }
-                    });
-
-                } catch (Exception ex) {
-
-                }
-
-                System.out.println("end");
-
-            }
-        };
-
-        for (int i = 0; i <20 ; i++) {
-            Thread t1=new Thread(r);
-            t1.start();
-        }
-
-        while (true){
-            Thread.sleep(10000);
-        }
     }
 
     @After
