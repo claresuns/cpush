@@ -299,12 +299,12 @@ public class APNSClientHandler extends Http2ConnectionHandler {
 
                                 @Override
                                 public void run() {
-                                    log.debug("Closing channel due to ping timeout.");
+                                    log.warn("Closing channel due to ping timeout.");
                                     future.channel().close();
                                 }
                             }, Constant.PING_TIME_OUT, TimeUnit.SECONDS);
                         } else {
-                            log.debug("Failed to write PING frame.", future.cause());
+                            log.warn("Failed to write PING frame.", future.cause());
                             future.channel().close();
                         }
                     }
@@ -320,7 +320,7 @@ public class APNSClientHandler extends Http2ConnectionHandler {
     @Override
     public void exceptionCaught(final ChannelHandlerContext context, final Throwable cause) throws Exception {
         if (cause instanceof WriteTimeoutException) {
-            log.debug("Closing connection due to write timeout.");
+            log.warn("Closing connection due to write timeout.");
             context.close();
         } else {
             log.warn("APNs client pipeline caught an exception.", cause);

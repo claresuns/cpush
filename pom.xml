@@ -6,7 +6,77 @@
 
     <groupId>cn.claresun</groupId>
     <artifactId>cpush</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
+
+    <repositories>
+        <repository>
+            <id>AUTOHOME</id>
+            <name>AUTOHOME Repository</name>
+            <url>http://10.168.0.49:8081/nexus/content/repositories/releases</url>
+        </repository>
+        <repository>
+            <id>oschina-repos</id>
+            <name>Oschina Releases</name>
+            <url>http://maven.oschina.net/content/groups/public</url>
+        </repository>
+        <repository>
+            <id>java-repos</id>
+            <name>Java Repository</name>
+            <url>http://download.java.net/maven/2/</url>
+        </repository>
+        <repository>
+            <id>springsource-repos</id>
+            <name>SpringSource Repository</name>
+            <url>http://repo.spring.io/release/</url>
+        </repository>
+        <repository>
+            <id>central-repos</id>
+            <name>Central Repository</name>
+            <url>http://repo.maven.apache.org/maven2</url>
+        </repository>
+        <repository>
+            <id>central-repos2</id>
+            <name>Central Repository 2</name>
+            <url>http://repo1.maven.org/maven2/</url>
+        </repository>
+        <repository>
+            <id>thinkgem-repos</id>
+            <name>ThinkGem Repository</name>
+            <url>http://git.oschina.net/thinkgem/repos/raw/master</url>
+        </repository>
+        <repository>
+            <id>thinkgem-repos2</id>
+            <name>ThinkGem Repository 2</name>
+            <url>https://raw.github.com/thinkgem/repository/master</url>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>AUTOHOME</id>
+            <name>AUTOHOME</name>
+            <url>http://10.168.0.49:8081/nexus/content/groups/public</url>
+        </pluginRepository>
+
+        <pluginRepository>
+            <id>oschina-repos</id>
+            <name>Oschina Releases</name>
+            <url>http://maven.oschina.net/content/groups/public</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <distributionManagement>
+        <repository>
+            <id>AUTOHOME</id>
+            <name>AUTOHOME Repository</name>
+            <url>http://10.168.0.49:8081/nexus/content/repositories/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>AUTOHOME</id>
+            <name>AUTOHOME Repository</name>
+            <url>http://10.168.0.49:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

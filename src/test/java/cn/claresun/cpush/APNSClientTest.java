@@ -13,6 +13,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -30,8 +32,9 @@ public class APNSClientTest {
     @Before
     public void before() throws Exception {
         semp.acquire();
+
         apnsClient = new APNSClient(new File("/home/claresun/cert/autohome.p12"), "111111", Constant.PRODUCTION_APNS_HOST, Constant.DEFAULT_APNS_PORT);
-        apnsClient.setWriteLimitBytes(50);
+        //apnsClient.setWriteLimitBytes(50);
         apnsClient.onDataReceived(new OnDataReceived<APNSNotificationResponse>() {
             @Override
             public void received(APNSNotificationResponse data) {
@@ -67,7 +70,10 @@ public class APNSClientTest {
             payloadBuilder.setAlertBody("autohome");
 
             final String payload = payloadBuilder.buildWithDefaultMaximumLength();
-            final String token = SSLUtil.sanitizeTokenString("d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a1");
+
+            //d7939eac21d9182100711cf45a7a117ccf58685fc00047ad0ff9a0f494504a1a
+            //d9b201615d7b9bca06be8c5aba7007d1d5781d1cc86309e5ca0a223958712cd1
+            final String token = SSLUtil.sanitizeTokenString("d9b201615d7b9bca06be8c5aba7007d1d5781d1cc86309e5ca0a223958712cd1");
 
             pushNotification = new APNSNotification(token, "com.autohome", payload);
         }
@@ -86,6 +92,13 @@ public class APNSClientTest {
         } catch (Exception ex) {
 
         }
+
+        new Timer().schedule(new TimerTask() {
+            @Override
+            public void run() {
+                semp.release();
+            }
+        }, 5000);
 
         semp.acquire();
 

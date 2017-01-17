@@ -113,7 +113,9 @@ public class APNSClient {
 
                 pipeline.addLast(sslContext.newHandler(channel.alloc()));
 
-                pipeline.addLast(new ChannelTrafficShapingHandler(APNSClient.this.writeLimitBytes,0));
+                if (APNSClient.this.writeLimitBytes > 0) {
+                    pipeline.addLast(new ChannelTrafficShapingHandler(APNSClient.this.writeLimitBytes, 0));
+                }
 
                 pipeline.addLast(new ApplicationProtocolNegotiationHandler("") {
                     @Override
