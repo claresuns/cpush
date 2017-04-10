@@ -56,7 +56,10 @@ public class InetAddressPool {
 
         InetAddress[] addresses;
         try {
+            // clear cache
+            InetAddressCacheUtil.removeAddressCache(hostName);
             addresses = InetAddress.getAllByName(hostName);
+
         } catch (UnknownHostException e) {
             log.error("The InetAddress pool initialize failured.");
             throw new PoolNotReadyException();

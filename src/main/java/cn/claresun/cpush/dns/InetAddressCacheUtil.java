@@ -145,6 +145,20 @@ public class InetAddressCacheUtil {
         return ADDRESS_CACHE_AND_NEGATIVE_CACHE;
     }
 
+    static void removeAddressCache(String host) {
+        if (host == null || host.isEmpty()) {
+            return;
+        }
+        try {
+            synchronized (getAddressCacheFieldOfInetAddress()) {
+                getCacheFiledOfAddressCacheFiledOfInetAddress().remove(host);
+                getCacheFiledOfNegativeCacheFiledOfInetAddress().remove(host);
+            }
+        } catch (NoSuchFieldException e) {
+        } catch (IllegalAccessException e) {
+        }
+    }
+
     static Map<String, Object> getCacheFiledOfInetAddress$Cache0(Object inetAddressCache)
             throws NoSuchFieldException, IllegalAccessException {
         Class clazz = inetAddressCache.getClass();
